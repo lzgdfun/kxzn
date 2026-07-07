@@ -5,11 +5,6 @@ const DEFAULT_CHECK_CONCURRENCY = 10;
 const DEFAULT_IP_QUALITY_TIMEOUT_MS = 5000;
 const DEFAULT_TARGETS_CSV_URL = 'https://raw.githubusercontent.com/xgonce/Cloudflare_IP/refs/heads/main/result.csv';
 const DEFAULT_TARGETS_LIMIT = 20;
-const CLEAN_PROXY_KV_KEYS = {
-	results: 'checkproxy:clean_proxy_results',
-	targets: 'checkproxy:clean_proxy_targets',
-	meta: 'checkproxy:clean_proxy_meta'
-};
 const MANAGED_PROXY_KV_KEYS = {
 	items: 'checkproxy:managed_proxy_items',
 	settings: 'checkproxy:managed_proxy_settings'
@@ -35,8 +30,6 @@ export default {
 			return handleManagedApiRequest(request, env);
 		} else if (url.pathname === '/check') {
 			return handleCheckProxyRequest(request, env);
-		} else if (url.pathname === '/clean-proxies') {
-			return handleCleanProxiesRequest(request, env);
 		} else if (url.pathname === '/resolve') {
 			const proxyip = url.searchParams.get('proxyip');
 			if (!proxyip) {
@@ -93,7 +86,7 @@ async function mapWithConcurrencyOptimized(items, concurrency, mapper) {
 	return results;
 }
 
-// ========== 分批检测函数 ==========
+// ========== 分批检测函数（仅保留 IPPure 系数检测）==========
 async function checkBatchJobsOptimized(checkJobs, run, batchSize = DEFAULT_BATCH_SIZE, workerConcurrency = DEFAULT_WORKER_CONCURRENCY) {
 	if (isRunStopped(run) || !checkJobs.length) return;
 	
@@ -115,6 +108,7 @@ async function checkBatchJobsOptimized(checkJobs, run, batchSize = DEFAULT_BATCH
 			progressText.innerText = `正在批量检测... 第 ${batchIndex + 1} / ${batches.length} 批 (批大小: ${batchSize}, 并发: ${workerConcurrency})`;
 			const timeoutMs = Math.max(45000, batch.length * 10000); // 为每批分配足够时间
 			
+			// 仅检测 IPPure 系数，不检测 IP 纯净度
 			const result = await fetchJsonWithTimeout('/check', {
 				method: 'POST',
 				headers: {
@@ -123,8 +117,8 @@ async function checkBatchJobsOptimized(checkJobs, run, batchSize = DEFAULT_BATCH
 				body: JSON.stringify({
 					targets: batch.map(function (job) { return job.target; }),
 					resolve: false,
-					purity: true,
-					store: false, // 分批时先不写入，最后统一写入
+					purity: false,  // 禁用 IP 纯净度检测
+					store: false,   // 分批时先不写入，最后统一写入
 					limit: batch.length,
 					concurrency: workerConcurrency // 使用配置的并发数
 				})
