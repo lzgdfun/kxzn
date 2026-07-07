@@ -196,4 +196,393 @@ function jsonResponse(payload, status = 200, extraHeaders = {}) {
 	});
 }
 
+// ========== 前端 HTML 生成函数 ==========
+function generateHTML(beianContent) {
+	return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Check ProxyIP</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+		
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			min-height: 100vh;
+			padding: 20px;
+		}
+		
+		.container {
+			max-width: 1200px;
+			margin: 0 auto;
+		}
+		
+		.header {
+			text-align: center;
+			color: white;
+			margin-bottom: 40px;
+		}
+		
+		.header h1 {
+			font-size: 2.5em;
+			margin-bottom: 10px;
+		}
+		
+		.main-panel {
+			background: white;
+			border-radius: 12px;
+			padding: 30px;
+			box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+			margin-bottom: 30px;
+		}
+		
+		.ip-input {
+			display: flex;
+			gap: 10px;
+			margin-bottom: 20px;
+		}
+		
+		.ip-input input {
+			flex: 1;
+			padding: 12px;
+			border: 2px solid #e0e0e0;
+			border-radius: 6px;
+			font-size: 16px;
+			transition: border-color 0.3s;
+		}
+		
+		.ip-input input:focus {
+			outline: none;
+			border-color: #667eea;
+		}
+		
+		.ip-input button {
+			padding: 12px 24px;
+			background: #667eea;
+			color: white;
+			border: none;
+			border-radius: 6px;
+			font-size: 16px;
+			cursor: pointer;
+			transition: background 0.3s;
+		}
+		
+		.ip-input button:hover {
+			background: #764ba2;
+		}
+		
+		.results {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+			gap: 20px;
+			margin-top: 20px;
+		}
+		
+		.result-card {
+			background: #f5f5f5;
+			padding: 20px;
+			border-radius: 8px;
+			border-left: 4px solid #667eea;
+		}
+		
+		.result-card h3 {
+			margin-bottom: 10px;
+			color: #333;
+		}
+		
+		.result-card p {
+			font-size: 14px;
+			color: #666;
+			margin: 5px 0;
+		}
+		
+		.favorites-panel {
+			background: white;
+			border-radius: 12px;
+			padding: 30px;
+			box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+			margin-bottom: 30px;
+		}
+		
+		.favorites-panel h2 {
+			margin-bottom: 20px;
+			color: #333;
+		}
+		
+		.favorite-list {
+			display: grid;
+			gap: 10px;
+		}
+		
+		.favorite-item {
+			padding: 15px;
+			background: #f9f9f9;
+			border-radius: 6px;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			border: 1px solid #e0e0e0;
+		}
+		
+		.settings-panel {
+			background: white;
+			border-radius: 12px;
+			padding: 30px;
+			box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+			margin-bottom: 30px;
+		}
+		
+		.settings-panel h2 {
+			margin-bottom: 20px;
+			color: #333;
+		}
+		
+		.setting-item {
+			margin-bottom: 20px;
+			display: grid;
+			grid-template-columns: 150px 1fr;
+			gap: 15px;
+			align-items: center;
+		}
+		
+		.setting-item label {
+			font-weight: 500;
+			color: #333;
+		}
+		
+		.setting-item input,
+		.setting-item select {
+			padding: 10px;
+			border: 1px solid #e0e0e0;
+			border-radius: 6px;
+			font-size: 14px;
+		}
+		
+		.footer {
+			text-align: center;
+			color: white;
+			margin-top: 40px;
+			padding: 20px;
+		}
+		
+		.progress {
+			margin: 20px 0;
+			padding: 15px;
+			background: #f0f0f0;
+			border-radius: 6px;
+			display: none;
+		}
+		
+		.progress.active {
+			display: block;
+		}
+		
+		.progress-bar {
+			width: 100%;
+			height: 6px;
+			background: #e0e0e0;
+			border-radius: 3px;
+			overflow: hidden;
+			margin: 10px 0;
+		}
+		
+		.progress-fill {
+			height: 100%;
+			background: linear-gradient(90deg, #667eea, #764ba2);
+			width: 0%;
+			transition: width 0.3s;
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="header">
+			<h1>🔍 Check ProxyIP</h1>
+			<p>快速检测和验证代理IP质量</p>
+		</div>
+		
+		<!-- 主检测面板 -->
+		<div class="main-panel">
+			<h2>IP检测</h2>
+			<div class="ip-input">
+				<input type="text" id="ipInput" placeholder="输入要检测的IP或多个IP (逗号分隔)">
+				<button onclick="startCheck()">开始检测</button>
+			</div>
+			
+			<div class="progress" id="progress">
+				<div id="progressText">准备中...</div>
+				<div class="progress-bar">
+					<div class="progress-fill" id="progressFill"></div>
+				</div>
+			</div>
+			
+			<div class="results" id="results"></div>
+		</div>
+		
+		<!-- 收藏面板 -->
+		<div class="favorites-panel">
+			<h2>⭐ 我的收藏</h2>
+			<div class="favorite-list" id="favoriteList">
+				<p style="color: #999;">暂无收藏的IP</p>
+			</div>
+		</div>
+		
+		<!-- 设置面板 -->
+		<div class="settings-panel">
+			<h2>⚙️ 设置</h2>
+			
+			<div class="setting-item">
+				<label>批量检测大小</label>
+				<input type="number" id="batchSize" value="20" min="1" max="100">
+			</div>
+			
+			<div class="setting-item">
+				<label>Worker并发数</label>
+				<input type="number" id="workerConcurrency" value="3" min="1" max="10">
+			</div>
+			
+			<div class="setting-item">
+				<label>检测超时(秒)</label>
+				<input type="number" id="timeout" value="30" min="5" max="300">
+			</div>
+			
+			<button onclick="saveSettings()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer;">保存设置</button>
+		</div>
+		
+		<div class="footer">
+			<p>${beianContent}</p>
+		</div>
+	</div>
+	
+	<script>
+		let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+		let settings = {
+			batchSize: parseInt(localStorage.getItem('batchSize') || '20'),
+			workerConcurrency: parseInt(localStorage.getItem('workerConcurrency') || '3'),
+			timeout: parseInt(localStorage.getItem('timeout') || '30')
+		};
+		
+		// 初始化设置
+		document.getElementById('batchSize').value = settings.batchSize;
+		document.getElementById('workerConcurrency').value = settings.workerConcurrency;
+		document.getElementById('timeout').value = settings.timeout;
+		
+		function saveSettings() {
+			settings.batchSize = parseInt(document.getElementById('batchSize').value);
+			settings.workerConcurrency = parseInt(document.getElementById('workerConcurrency').value);
+			settings.timeout = parseInt(document.getElementById('timeout').value);
+			
+			localStorage.setItem('batchSize', settings.batchSize);
+			localStorage.setItem('workerConcurrency', settings.workerConcurrency);
+			localStorage.setItem('timeout', settings.timeout);
+			
+			alert('设置已保存');
+		}
+		
+		function startCheck() {
+			const input = document.getElementById('ipInput').value.trim();
+			if (!input) {
+				alert('请输入IP地址');
+				return;
+			}
+			
+			const ips = input.split(/[,\\s]+/).filter(ip => ip.length > 0);
+			checkIPs(ips);
+		}
+		
+		async function checkIPs(ips) {
+			const progress = document.getElementById('progress');
+			const results = document.getElementById('results');
+			progress.classList.add('active');
+			results.innerHTML = '';
+			
+			for (let i = 0; i < ips.length; i += settings.batchSize) {
+				const batch = ips.slice(i, i + settings.batchSize);
+				const progressText = document.getElementById('progressText');
+				progressText.textContent = \`正在检测... \${i + 1} / \${ips.length}\`;
+				
+				try {
+					const response = await fetch('/check', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							targets: batch,
+							resolve: false,
+							purity: false,
+							limit: batch.length,
+							concurrency: settings.workerConcurrency
+						})
+					});
+					
+					const data = await response.json();
+					displayResults(data.payload?.results || [batch]);
+				} catch (error) {
+					console.error('检测错误:', error);
+					progressText.textContent = '检测失败: ' + error.message;
+				}
+			}
+			
+			progress.classList.remove('active');
+		}
+		
+		function displayResults(results) {
+			const resultsContainer = document.getElementById('results');
+			results.forEach(result => {
+				const card = document.createElement('div');
+				card.className = 'result-card';
+				card.innerHTML = \`
+					<h3>\${result.target || result.input}</h3>
+					<p>状态: \${result.success ? '✅ 可用' : '❌ 不可用'}</p>
+					<p>IPPure系数: \${(result.ippure || 0).toFixed(2)}</p>
+					\${result.message ? \`<p>备注: \${result.message}</p>\` : ''}
+					<button onclick="addFavorite('\${result.target || result.input}')" style="margin-top: 10px; padding: 8px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">⭐ 收藏</button>
+				\`;
+				resultsContainer.appendChild(card);
+			});
+		}
+		
+		function addFavorite(ip) {
+			if (!favorites.includes(ip)) {
+				favorites.push(ip);
+				localStorage.setItem('favorites', JSON.stringify(favorites));
+				updateFavoritesList();
+				alert('已收藏');
+			} else {
+				alert('已存在');
+			}
+		}
+		
+		function removeFavorite(ip) {
+			favorites = favorites.filter(f => f !== ip);
+			localStorage.setItem('favorites', JSON.stringify(favorites));
+			updateFavoritesList();
+		}
+		
+		function updateFavoritesList() {
+			const favoriteList = document.getElementById('favoriteList');
+			if (favorites.length === 0) {
+				favoriteList.innerHTML = '<p style="color: #999;">暂无收藏的IP</p>';
+			} else {
+				favoriteList.innerHTML = favorites.map(ip => \`
+					<div class="favorite-item">
+						<span>\${ip}</span>
+						<button onclick="removeFavorite('\${ip}')" style="padding: 5px 10px; background: #ff6b6b; color: white; border: none; border-radius: 4px; cursor: pointer;">删除</button>
+					</div>
+				\`).join('');
+			}
+		}
+		
+		// 页面加载时更新收藏列表
+		updateFavoritesList();
+	</script>
+</body>
+</html>`;
+}
+
 // ... (后续代码继续保持不变) ...
