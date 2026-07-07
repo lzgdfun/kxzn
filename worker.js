@@ -1,4 +1,4 @@
-const DEFAULT_BEIAN_CONTENT = `© 2025 - 2026 Check ProxyIP · 基于 <a href="https://github.com/cmliu/CF-Workers-CheckProxyIP" target="_blank" rel="noreferrer">Cloudflare Workers 构建与运行<[...]`;
+const DEFAULT_BEIAN_CONTENT = `© 2025 - 2026 Check ProxyIP · 基于 <a href="https://github.com/cmliu/CF-Workers-CheckProxyIP" target="_blank" rel="noreferrer">Cloudflare Workers 构建与运行</a>`;
 const RESOLVE_BATCH_LIMIT = 15;
 const CHECK_BATCH_LIMIT = 100;
 const DEFAULT_CHECK_CONCURRENCY = 10;
@@ -18,11 +18,11 @@ const DEFAULT_PAGE_PASSWORD = 'wukong';
 const DEFAULT_SUB_TOKEN = 'wukong';
 const DEFAULT_NODE_TEMPLATE = 'vless://d0298536-d670-4045-bbb1-ddd5ea68683e@54.65.58.58:443?encryption=none&security=tls&sni=edcm.nrtpu.dpdns.org&fp=chrome&insecure=0&allowInsecure=0&ech=https%3A%[...]';
 
-// ========== 关键修复：降低并发限制 ==========
-// 原始值可能过高，导致子请求超限。Cloudflare Workers 默认允许约 50 个子请求
-const OPTIMIZED_CHECK_CONCURRENCY = 4;  // 降低到 4（从原来的可能值）
-const OPTIMIZED_BATCH_SIZE = 10;        // 每批检测 10 个 IP
-const REQUEST_QUEUE_DELAY = 50;         // 请求队列延迟（毫秒）
+// ========== 批量检测参数配置 ==========
+// 这些可以在前端配置面板中调整
+const DEFAULT_BATCH_SIZE = 20;      // 前端分批大小，n = 20 个/批
+const DEFAULT_WORKER_CONCURRENCY = 3; // Worker 内部并发数，m = 3
+const REQUEST_QUEUE_DELAY = 50;     // 请求队列延迟（毫秒）
 
 export default {
 	async fetch(request, env) {
@@ -71,12 +71,10 @@ export default {
 	}
 };
 
-// ... (中间的代码保持不变，这里省略) ...
-
-// ========== 关键修复：优化并发控制函数 ==========
+// ========== 优化并发控制函数 ==========
 async function mapWithConcurrencyOptimized(items, concurrency, mapper) {
 	// 强制限制并发数，防止超过 Cloudflare 子请求限制
-	const SAFE_CONCURRENCY = Math.min(concurrency, OPTIMIZED_CHECK_CONCURRENCY);
+	const SAFE_CONCURRENCY = Math.min(concurrency, DEFAULT_WORKER_CONCURRENCY);
 	const limit = Math.max(1, Math.min(SAFE_CONCURRENCY, items.length || 1));
 	const results = new Array(items.length);
 	let nextIndex = 0;
@@ -95,14 +93,14 @@ async function mapWithConcurrencyOptimized(items, concurrency, mapper) {
 	return results;
 }
 
-// ========== 关键修复：分批检测函数 ==========
-async function checkBatchJobsOptimized(checkJobs, run) {
+// ========== 分批检测函数 ==========
+async function checkBatchJobsOptimized(checkJobs, run, batchSize = DEFAULT_BATCH_SIZE, workerConcurrency = DEFAULT_WORKER_CONCURRENCY) {
 	if (isRunStopped(run) || !checkJobs.length) return;
 	
-	// 按 OPTIMIZED_BATCH_SIZE 分批处理
+	// 按指定的 batchSize 分批处理
 	const batches = [];
-	for (let i = 0; i < checkJobs.length; i += OPTIMIZED_BATCH_SIZE) {
-		batches.push(checkJobs.slice(i, i + OPTIMIZED_BATCH_SIZE));
+	for (let i = 0; i < checkJobs.length; i += batchSize) {
+		batches.push(checkJobs.slice(i, i + batchSize));
 	}
 
 	const itemByTarget = new Map(checkJobs.map(function (job) {
@@ -114,7 +112,7 @@ async function checkBatchJobsOptimized(checkJobs, run) {
 		if (isRunStopped(run)) break;
 
 		try {
-			progressText.innerText = `正在批量检测... 第 ${batchIndex + 1} / ${batches.length} 批`;
+			progressText.innerText = `正在批量检测... 第 ${batchIndex + 1} / ${batches.length} 批 (批大小: ${batchSize}, 并发: ${workerConcurrency})`;
 			const timeoutMs = Math.max(45000, batch.length * 10000); // 为每批分配足够时间
 			
 			const result = await fetchJsonWithTimeout('/check', {
@@ -128,7 +126,7 @@ async function checkBatchJobsOptimized(checkJobs, run) {
 					purity: true,
 					store: false, // 分批时先不写入，最后统一写入
 					limit: batch.length,
-					concurrency: OPTIMIZED_CHECK_CONCURRENCY // 使用优化后的并发数
+					concurrency: workerConcurrency // 使用配置的并发数
 				})
 			}, timeoutMs, run?.controller.signal);
 			throwIfRunStopped(run);
@@ -190,7 +188,7 @@ async function checkBatchJobsOptimized(checkJobs, run) {
 	}
 }
 
-// ========== 其他代码保持原样 ==========
+// ========== 响应函数 ==========
 function jsonResponse(payload, status = 200, extraHeaders = {}) {
 	return new Response(JSON.stringify(payload), {
 		status,
